@@ -28,23 +28,24 @@
 #define btA 5        // Pino do botão A
 #define btB 6        // Pino do botão B
 #define Matrix_LED 7 // Pino de controle da matriz de LEDs
-#define led_g 11
-#define led_b 12
+#define led_g 11 //LED verde
+#define led_b 12 //LED azul
 
 // Variáveis globais
-static volatile uint32_t verde = 0;   
-static volatile uint32_t azul = 0;         
+static volatile uint32_t verde = 0;    // Estado LED verde
+static volatile uint32_t azul = 0;     // Estado LED azul    
 static volatile uint32_t last_time = 0;  // Armazena o tempo do último evento (em microssegundos)
 static volatile uint intensidade = 50; // Armazena a intensidade da matriz de LEDs
 ssd1306_t ssd; // Inicializa a estrutura do display
-bool cor = true;
+bool cor = true; 
 double r = 0.0, b = 0.0, g = 0.0;
 PIO pio = pio0;  // Seleciona o primeiro bloco de PIO
-bool ok;
-uint16_t i;
-uint32_t valor_led;
-uint sm;
+bool ok; // verificação de clock
+uint16_t i; //variavel auxiliar
+uint32_t valor_led; // cor dos LEDs
+uint sm; // maquina de estado da PIO
 
+//Prototupação da função de interrupção 
 static void gpio_irq_handler(uint gpio, uint32_t events);
 
 // Função para definir a intensidade das cores do LED
@@ -78,6 +79,7 @@ int main()
   // Configura a frequência de clock para 128 MHz
   ok = set_sys_clock_khz(128000, false);
 
+  //Inicializa a comunicação via UART
   stdio_init_all();
 
   if (ok) printf("clock set to %ld\n", clock_get_hz(clk_sys));
@@ -87,7 +89,7 @@ int main()
   sm = pio_claim_unused_sm(pio, true);               // Adquire uma máquina de estado
   pio_matrix_program_init(pio, sm, offset, Matrix_LED);   // Inicializa a PIO
 
-  // I2C Initialisation. Using it at 400Khz.
+  // Inicialização do barramento I2C
   i2c_init(I2C_PORT, 400 * 1000);
 
   gpio_set_function(I2C_SDA, GPIO_FUNC_I2C); // Set the GPIO pin function to I2C
@@ -95,6 +97,7 @@ int main()
   gpio_pull_up(I2C_SDA); // Pull up the data line
   gpio_pull_up(I2C_SCL); // Pull up the clock line
   
+  //Inicializa o display OLED
   ssd1306_init(&ssd, WIDTH, HEIGHT, false, endereco, I2C_PORT); // Inicializa o display
   ssd1306_config(&ssd); // Configura o display
   ssd1306_send_data(&ssd); // Envia os dados para o display
@@ -121,15 +124,14 @@ int main()
   gpio_init(led_b);
   gpio_set_dir(led_b, GPIO_OUT);
 
-  //desliga matriz de leds
-
-
   // Configuração das interrupções das GPIOs
   gpio_set_irq_enabled_with_callback(btA, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
   gpio_set_irq_enabled(btB, GPIO_IRQ_EDGE_FALL, true);
   
   // Mensagem inicial
   printf("RP2040 inicializado. Digite algum Caractere ou Numero.\n");
+
+  //desliga a matriz LEDs 5x5
   desenho_pio(nums[10], valor_led, pio, sm, r, g, b);
 
   // Atualiza o conteúdo do display com animações
@@ -165,6 +167,7 @@ int main()
           ssd1306_draw_string(&ssd, buffer, 20, 50); // Desenha uma string
           ssd1306_send_data(&ssd); // Atualiza o display
 
+          //desliga a matriz LEDs 5x5
           desenho_pio(nums[10], valor_led, pio, sm, r, g, b);
 
           printf("Caractere foi inserido: %c\n", c);
@@ -187,6 +190,7 @@ int main()
         ssd1306_draw_string(&ssd, buffer, 20, 50); // Desenha uma string
         ssd1306_send_data(&ssd); // Atualiza o display
 
+        //Condição para ligar a matriz LEDs 5x5
         switch (c) {
           case '0':
             printf("Número Inserido: %c\n", c);
@@ -252,6 +256,7 @@ void gpio_irq_handler(uint gpio, uint32_t events) {
         gpio_put(led_b, false);
 
         printf("LED Verde Ligado\n");
+        printf("Digite outro Caractere ou Numero:\n");
 
         azul = 0;
         verde = 1;
@@ -276,6 +281,7 @@ void gpio_irq_handler(uint gpio, uint32_t events) {
         verde = 0;
 
         printf("LED Azul Ligado\n");
+        printf("Digite outro Caractere ou Numero:\n");
 
         ssd1306_fill(&ssd, !cor); // Limpa o display
         ssd1306_rect(&ssd, 3, 3, 122, 58, cor, !cor); // Desenha um retângulo
